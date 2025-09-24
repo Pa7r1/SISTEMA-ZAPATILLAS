@@ -34,3 +34,6 @@ coverage/
 # Misc
 *.bak
 *.tmp
+
+doc-entities-ts.txt
+doc-mysql-sp.txt
