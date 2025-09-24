@@ -13,10 +13,13 @@ export type SyncRequestHandler = (
   next: NextFunction
 ) => void | Response;
 
-export type ControllerHandler = AsyncRequestHandler | SyncRequestHandler | RequestHandler;
+export type ControllerHandler =
+  | AsyncRequestHandler
+  | SyncRequestHandler
+  | RequestHandler;
 
 // Definición de métodos HTTP disponibles
-export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
+export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
 // Configuración de rutas
 export interface RouteConfig {
@@ -40,7 +43,7 @@ export interface Controller extends StandardMethods {
   [key: string]: string | ControllerHandler | ControllerHandler[] | undefined;
 }
 
-// Mapa de métodos estándar - ahora más flexible
+// Mapa de métodos estándar
 export const MethodMap: Record<string, RouteConfig> = {
   // Métodos CRUD estándar
   create: { method: "post", url: (name: string) => `/${name}` },
@@ -48,28 +51,67 @@ export const MethodMap: Record<string, RouteConfig> = {
   update: { method: "put", url: (name: string) => `/${name}/:id` },
   delete: { method: "delete", url: (name: string) => `/${name}/:id` },
   search: { method: "get", url: (name: string) => `/${name}/buscar` },
-  
+
   // Métodos específicos para zapatillas
   index: { method: "get", url: (name: string) => `/${name}` },
   activos: { method: "get", url: (name: string) => `/${name}/activos` },
   inactivos: { method: "get", url: (name: string) => `/${name}/inactivos` },
   habilitar: { method: "put", url: (name: string) => `/${name}/habilitar/:id` },
-  deshabilitar: { method: "put", url: (name: string) => `/${name}/deshabilitar/:id` },
-  
+  deshabilitar: {
+    method: "put",
+    url: (name: string) => `/${name}/deshabilitar/:id`,
+  },
+
   // Métodos para inventario
   stock: { method: "get", url: (name: string) => `/${name}/stock` },
-  stockMinimo: { method: "get", url: (name: string) => `/${name}/stock/minimo` },
-  actualizarStock: { method: "put", url: (name: string) => `/${name}/stock/:id` },
-  
+  stockMinimo: {
+    method: "get",
+    url: (name: string) => `/${name}/stock/minimo`,
+  },
+  actualizarStock: {
+    method: "put",
+    url: (name: string) => `/${name}/stock/:id`,
+  },
+
   // Métodos para ventas
   todasVentas: { method: "get", url: (name: string) => `/${name}` },
   ventasHoy: { method: "get", url: (name: string) => `/${name}/hoy` },
   ventasPorFecha: { method: "get", url: (name: string) => `/${name}/reporte` },
   gananciaDia: { method: "get", url: (name: string) => `/${name}/ganancia` },
-  
+
   // Métodos para clientes
   clientesActivos: { method: "get", url: (name: string) => `/${name}/activos` },
-  historialCompras: { method: "get", url: (name: string) => `/${name}/:id/historial` },
+  historialCompras: {
+    method: "get",
+    url: (name: string) => `/${name}/:id/historial`,
+  },
+
+  // Métodos específicos para productos
+  proveedor: {
+    method: "get",
+    url: (name: string) => `/${name}/proveedor/:idProveedor`,
+  },
+  ajustarStock: { method: "put", url: (name: string) => `/${name}/:id/stock` },
+  historialPrecios: {
+    method: "get",
+    url: (name: string) => `/${name}/:id/precios`,
+  },
+  cambiarPrecio: {
+    method: "put",
+    url: (name: string) => `/${name}/:id/precio`,
+  },
+  agregarImagen: {
+    method: "post",
+    url: (name: string) => `/${name}/:id/imagen`,
+  },
+  cargaMasiva: {
+    method: "post",
+    url: (name: string) => `/${name}/carga-masiva`,
+  },
+  cargarArchivo: {
+    method: "post",
+    url: (name: string) => `/${name}/cargar-archivo`,
+  },
 } as const;
 
 // Tipo para los nombres de métodos disponibles
@@ -77,11 +119,11 @@ export type MethodName = keyof typeof MethodMap;
 
 // Tipo para validar que el controlador tenga la estructura correcta
 export type ValidatedController = {
-  [K in keyof Controller]: K extends 'name' 
-    ? string 
-    : K extends 'prefix' 
-    ? string | undefined
-    : K extends MethodName
-    ? ControllerHandler | ControllerHandler[]
-    : ControllerHandler | ControllerHandler[] | string | undefined;
+  [K in keyof Controller]: K extends "name"
+    ? string
+    : K extends "prefix"
+      ? string | undefined
+      : K extends MethodName
+        ? ControllerHandler | ControllerHandler[]
+        : ControllerHandler | ControllerHandler[] | string | undefined;
 };
