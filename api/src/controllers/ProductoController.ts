@@ -1,57 +1,23 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { ProductoService } from "../services/ProductoService.js";
-import { TipoPrecio } from "../entities/HistorialPrecio.js";
 import { asyncHandler, createError } from "../utils/errorHandlers.js";
 import { Controller } from "../types/controller.types.js";
 import { uploadJSON } from "../utils/uploadMiddleware.js";
+import {
+  validarId,
+  validarActualizarProducto,
+  validarAjustarStock,
+  validarCambioPrecio,
+  validarCargaMasiva,
+  validarCrearProducto,
+  validarImagen,
+} from "../utils/productoMiddleware.js";
+import {
+  parsePrecioFromCatalog,
+  normalizeProductName,
+} from "../helpers/helpersProducto.js";
 
 const productoService = new ProductoService();
-
-// Helper para parsear precios desde formato de catálogo
-const parsePrecioFromCatalog = (precioStr: string): number => {
-  if (!precioStr || precioStr.toLowerCase().includes("sin precio")) {
-    throw new Error("Precio inválido");
-  }
-
-  const precioTexto = precioStr.replace(/[^\d,\.]/g, "");
-  let valorNumerico = NaN;
-
-  if (precioTexto.includes(",") && precioTexto.includes(".")) {
-    if (precioTexto.indexOf(",") > precioTexto.indexOf(".")) {
-      valorNumerico = parseFloat(
-        precioTexto.replace(/\./g, "").replace(",", ".")
-      );
-    } else {
-      valorNumerico = parseFloat(precioTexto.replace(/,/g, ""));
-    }
-  } else if (precioTexto.includes(",")) {
-    const partes = precioTexto.split(",");
-    if (partes[1]?.length === 2) {
-      valorNumerico = parseFloat(precioTexto.replace(",", "."));
-    } else {
-      valorNumerico = parseFloat(precioTexto.replace(/,/g, ""));
-    }
-  } else {
-    valorNumerico = parseFloat(precioTexto.replace(/\./g, ""));
-  }
-
-  if (isNaN(valorNumerico) || valorNumerico < 100) {
-    throw new Error("Precio demasiado bajo o inválido");
-  }
-
-  return Math.round(valorNumerico * 100) / 100; // Redondear a 2 decimales
-};
-
-// Helper para normalizar nombres para detectar duplicados
-const normalizeProductName = (nombre: string): string => {
-  return nombre
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\w\s]/g, "");
-};
 
 // Handlers del controlador
 const obtenerTodosProductos = asyncHandler(
@@ -535,236 +501,6 @@ const agregarImagen = asyncHandler(
     });
   }
 );
-
-// Middleware de validaciones
-const validarId = (req: Request, res: Response, next: NextFunction): void => {
-  const { id } = req.params;
-
-  if (!id || isNaN(Number(id))) {
-    res.status(400).json({
-      success: false,
-      message: "ID inválido",
-    });
-    return;
-  }
-
-  next();
-};
-
-const validarCargaMasiva = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { productos, idProveedor, aumentoPorcentaje, stockPorDefecto } =
-    req.body;
-
-  if (!Array.isArray(productos)) {
-    res.status(400).json({
-      success: false,
-      message: "Se requiere un array de productos",
-    });
-    return;
-  }
-
-  if (productos.length === 0) {
-    res.status(400).json({
-      success: false,
-      message: "El array de productos no puede estar vacío",
-    });
-    return;
-  }
-
-  if (productos.length > 500) {
-    res.status(400).json({
-      success: false,
-      message: "Máximo 500 productos por carga",
-    });
-    return;
-  }
-
-  if (
-    idProveedor !== undefined &&
-    (typeof idProveedor !== "number" || idProveedor <= 0)
-  ) {
-    res.status(400).json({
-      success: false,
-      message: "ID del proveedor debe ser un número positivo",
-    });
-    return;
-  }
-
-  if (
-    aumentoPorcentaje !== undefined &&
-    (typeof aumentoPorcentaje !== "number" ||
-      aumentoPorcentaje < 0 ||
-      aumentoPorcentaje > 1000)
-  ) {
-    res.status(400).json({
-      success: false,
-      message: "El aumento porcentaje debe estar entre 0 y 1000",
-    });
-    return;
-  }
-
-  if (
-    stockPorDefecto !== undefined &&
-    (typeof stockPorDefecto !== "number" || stockPorDefecto < 0)
-  ) {
-    res.status(400).json({
-      success: false,
-      message: "El stock por defecto debe ser un número positivo o cero",
-    });
-    return;
-  }
-
-  next();
-};
-
-const validarCrearProducto = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { idProveedor, nombre, precioProveedor, precioMiLocal } = req.body;
-
-  if (!idProveedor || !nombre || !precioProveedor || !precioMiLocal) {
-    res.status(400).json({
-      success: false,
-      message:
-        "Faltan campos requeridos: idProveedor, nombre, precioProveedor, precioMiLocal",
-    });
-    return;
-  }
-
-  if (typeof precioProveedor !== "number" || precioProveedor <= 0) {
-    res.status(400).json({
-      success: false,
-      message: "El precio del proveedor debe ser un número positivo",
-    });
-    return;
-  }
-
-  if (typeof precioMiLocal !== "number" || precioMiLocal <= 0) {
-    res.status(400).json({
-      success: false,
-      message: "El precio local debe ser un número positivo",
-    });
-    return;
-  }
-
-  next();
-};
-
-const validarActualizarProducto = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { nombre, precioProveedor, precioMiLocal } = req.body;
-
-  if (
-    precioProveedor !== undefined &&
-    (typeof precioProveedor !== "number" || precioProveedor <= 0)
-  ) {
-    res.status(400).json({
-      success: false,
-      message: "El precio del proveedor debe ser un número positivo",
-    });
-    return;
-  }
-
-  if (
-    precioMiLocal !== undefined &&
-    (typeof precioMiLocal !== "number" || precioMiLocal <= 0)
-  ) {
-    res.status(400).json({
-      success: false,
-      message: "El precio local debe ser un número positivo",
-    });
-    return;
-  }
-
-  if (nombre !== undefined && (!nombre || nombre.trim().length === 0)) {
-    res.status(400).json({
-      success: false,
-      message: "El nombre no puede estar vacío",
-    });
-    return;
-  }
-
-  next();
-};
-
-const validarAjustarStock = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { cantidad, motivo } = req.body;
-
-  if (cantidad === undefined || typeof cantidad !== "number") {
-    res.status(400).json({
-      success: false,
-      message: "La cantidad es requerida y debe ser un número",
-    });
-    return;
-  }
-
-  if (!motivo || motivo.trim().length === 0) {
-    res.status(400).json({
-      success: false,
-      message: "El motivo es requerido",
-    });
-    return;
-  }
-
-  next();
-};
-
-const validarCambioPrecio = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { precio, tipo } = req.body;
-
-  if (!precio || typeof precio !== "number" || precio <= 0) {
-    res.status(400).json({
-      success: false,
-      message: "El precio debe ser un número positivo",
-    });
-    return;
-  }
-
-  if (!tipo || !Object.values(TipoPrecio).includes(tipo)) {
-    res.status(400).json({
-      success: false,
-      message: "Tipo de precio inválido. Use 'proveedor' o 'mi_local'",
-    });
-    return;
-  }
-
-  next();
-};
-
-const validarImagen = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { url } = req.body;
-
-  if (!url || typeof url !== "string" || url.trim().length === 0) {
-    res.status(400).json({
-      success: false,
-      message: "La URL de la imagen es requerida",
-    });
-    return;
-  }
-
-  next();
-};
 
 // Exportar controlador siguiendo el patrón
 const productosController: Controller = {
