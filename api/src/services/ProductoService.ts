@@ -1,12 +1,13 @@
-import { Repository } from "typeorm";
-import { Producto } from "@entities/Producto.js";
-import { HistorialPrecio, TipoPrecio } from "@entities/HistorialPrecio.js";
-import { ImagenProducto } from "@entities/ImagenProducto.js";
+import { Repository, EntityManager } from "typeorm";
+import { AppDataSource } from "../data-source.js";
+import { Producto } from "../entities/Producto.js";
+import { HistorialPrecio, TipoPrecio } from "../entities/HistorialPrecio.js";
+import { ImagenProducto } from "../entities/ImagenProducto.js";
 import {
   StockMovimiento,
   TipoMovimiento,
   OrigenMovimiento,
-} from "@entities/StockMovimiento.js";
+} from "../entities/StockMovimiento.js";
 
 export interface IProductoService {
   obtenerTodos(): Promise<Producto[]>;
@@ -81,19 +82,17 @@ export class ProductoService implements IProductoService {
           proveedor: true,
           imagenes: true,
           historialPrecios: true,
-          movimientosStock: {
-            // Limitar a los últimos 10 movimientos para no sobrecargar
-          },
         },
       });
 
-      // Si necesitas los movimientos ordenados por fecha
-      if (producto?.movimientosStock) {
-        producto.movimientosStock = await this.stockMovimientoRepository.find({
+      // Movimientos ordenados por fecha
+      if (producto) {
+        const movimientos = await this.stockMovimientoRepository.find({
           where: { idProducto: id },
           order: { fecha: "DESC" },
           take: 10,
         });
+        (producto as any).movimientosStock = movimientos;
       }
 
       return producto;
@@ -128,8 +127,8 @@ export class ProductoService implements IProductoService {
         .createQueryBuilder("producto")
         .leftJoinAndSelect("producto.proveedor", "proveedor")
         .leftJoinAndSelect("producto.imagenes", "imagenes")
-        .where("producto.nombre ILIKE :nombre", { nombre: `%${nombre}%` })
-        .orWhere("producto.descripcion ILIKE :nombre", {
+        .where("producto.nombre LIKE :nombre", { nombre: `%${nombre}%` })
+        .orWhere("producto.descripcion LIKE :nombre", {
           nombre: `%${nombre}%`,
         })
         .orderBy("producto.nombre", "ASC")
@@ -150,7 +149,7 @@ export class ProductoService implements IProductoService {
       const nuevoProducto = this.productoRepository.create({
         idProveedor: data.idProveedor,
         nombre: data.nombre,
-        descripcion: data.descripcion,
+        descripcion: data.descripcion ?? null,
         precioProveedor: data.precioProveedor,
         precioMiLocal: data.precioMiLocal,
         stockActual: data.stockActual || 0,
@@ -214,13 +213,22 @@ export class ProductoService implements IProductoService {
         throw new Error("Producto no encontrado");
       }
 
+      // Preparar datos de actualización
+      const datosActualizacion: any = {};
+      if (data.nombre !== undefined) datosActualizacion.nombre = data.nombre;
+      if (data.descripcion !== undefined)
+        datosActualizacion.descripcion = data.descripcion ?? null;
+      if (data.precioProveedor !== undefined)
+        datosActualizacion.precioProveedor = data.precioProveedor;
+      if (data.precioMiLocal !== undefined)
+        datosActualizacion.precioMiLocal = data.precioMiLocal;
+
       // Actualizar producto
-      const productosActualizados = { ...data };
-      await queryRunner.manager.update(Producto, id, productosActualizados);
+      await queryRunner.manager.update(Producto, id, datosActualizacion);
 
       // Registrar cambios de precio en historial
       if (
-        data.precioProveedor &&
+        data.precioProveedor !== undefined &&
         data.precioProveedor !== productoExistente.precioProveedor
       ) {
         await this.crearHistorialPrecio(
@@ -232,7 +240,7 @@ export class ProductoService implements IProductoService {
       }
 
       if (
-        data.precioMiLocal &&
+        data.precioMiLocal !== undefined &&
         data.precioMiLocal !== productoExistente.precioMiLocal
       ) {
         await this.crearHistorialPrecio(
@@ -265,24 +273,29 @@ export class ProductoService implements IProductoService {
       // Verificar que el producto existe
       const producto = await this.productoRepository.findOne({
         where: { id },
-        relations: {
-          detallesVenta: true,
-          detallesCompra: true,
-          detallesEncargue: true,
-        },
       });
 
       if (!producto) {
         throw new Error("Producto no encontrado");
       }
 
-      // Verificar si tiene registros relacionados
-      const tieneVentas =
-        producto.detallesVenta && producto.detallesVenta.length > 0;
-      const tieneCompras =
-        producto.detallesCompra && producto.detallesCompra.length > 0;
-      const tieneEncargues =
-        producto.detallesEncargue && producto.detallesEncargue.length > 0;
+      // Verificar si tiene registros relacionados con lazy loading
+      const detallesVenta = await queryRunner.manager.query(
+        "SELECT COUNT(*) as count FROM detalle_venta_local WHERE id_producto = ?",
+        [id]
+      );
+      const detallesCompra = await queryRunner.manager.query(
+        "SELECT COUNT(*) as count FROM detalle_compra_mayorista WHERE id_producto = ?",
+        [id]
+      );
+      const detallesEncargue = await queryRunner.manager.query(
+        "SELECT COUNT(*) as count FROM detalle_encargue_proveedor WHERE id_producto = ?",
+        [id]
+      );
+
+      const tieneVentas = detallesVenta[0].count > 0;
+      const tieneCompras = detallesCompra[0].count > 0;
+      const tieneEncargues = detallesEncargue[0].count > 0;
 
       if (tieneVentas || tieneCompras || tieneEncargues) {
         throw new Error(
@@ -303,7 +316,10 @@ export class ProductoService implements IProductoService {
       await queryRunner.rollbackTransaction();
       console.error(`Error eliminando producto ${id}:`, error);
 
-      if (error.message.includes("transacciones asociadas")) {
+      if (
+        error instanceof Error &&
+        error.message.includes("transacciones asociadas")
+      ) {
         throw error;
       }
       throw new Error("Error al eliminar producto");
@@ -385,17 +401,12 @@ export class ProductoService implements IProductoService {
 
   async obtenerConStockBajo(limite: number = 5): Promise<Producto[]> {
     try {
-      return await this.productoRepository.find({
-        where: {
-          stockActual: AppDataSource.createQueryBuilder()
-            .select()
-            .where("stockActual <= :limite", { limite }) as any,
-        },
-        relations: {
-          proveedor: true,
-        },
-        order: { stockActual: "ASC" },
-      });
+      return await this.productoRepository
+        .createQueryBuilder("producto")
+        .leftJoinAndSelect("producto.proveedor", "proveedor")
+        .where("producto.stockActual <= :limite", { limite })
+        .orderBy("producto.stockActual", "ASC")
+        .getMany();
     } catch (error) {
       console.error("Error obteniendo productos con stock bajo:", error);
       throw new Error("Error al obtener productos con stock bajo");
@@ -406,9 +417,6 @@ export class ProductoService implements IProductoService {
     try {
       return await this.historialPrecioRepository.find({
         where: { idProducto: id },
-        relations: {
-          producto: true,
-        },
         order: { fechaCambio: "DESC" },
       });
     } catch (error) {
@@ -442,7 +450,7 @@ export class ProductoService implements IProductoService {
 
   // Métodos auxiliares privados
   private async crearHistorialPrecio(
-    manager: any,
+    manager: EntityManager,
     productoId: number,
     precio: number,
     tipo: TipoPrecio
@@ -456,7 +464,7 @@ export class ProductoService implements IProductoService {
   }
 
   private async crearMovimientoStock(
-    manager: any,
+    manager: EntityManager,
     productoId: number,
     tipo: TipoMovimiento,
     cantidad: number,
@@ -470,7 +478,7 @@ export class ProductoService implements IProductoService {
       cantidad,
       motivo,
       origen,
-      referenciaId,
+      referenciaId: referenciaId ?? null,
     });
     await manager.save(StockMovimiento, movimiento);
   }
