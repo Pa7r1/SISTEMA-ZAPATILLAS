@@ -1,6 +1,7 @@
 import { AppDataSource } from "./data-source.js";
 import { Usuario, RolUsuario } from "./entities/Usuario.js";
 import { Cliente } from "./entities/Cliente.js";
+import { Proveedor } from "./entities/Proveedor.js";
 import bcrypt from "bcryptjs";
 
 /**
@@ -21,6 +22,7 @@ export const initializeDatabase = async (): Promise<void> => {
     // Ejecutar seeds
     await seedUsuarioAdmin();
     await seedClienteCasual();
+    await seedProveedorCasual();
 
     console.log("Seeding completado exitosamente");
   } catch (error) {
@@ -108,6 +110,33 @@ const seedClienteCasual = async (): Promise<void> => {
     console.log("EXITO: Cliente 'casual' creado");
   } catch (error) {
     console.error("ERROR: Error creando cliente casual:", error);
+    throw error;
+  }
+};
+
+/**
+ * Crea el proveedor "pacific" por defecto si no existe
+ */
+const seedProveedorCasual = async (): Promise<void> => {
+  try {
+    const provedorRepository = AppDataSource.getRepository(Proveedor);
+    const provedorYaExistente = await provedorRepository.count({
+      where: { nombre: "pacific" },
+    });
+    if (provedorYaExistente > 0) {
+      console.log("INFO: Proveedor 'pacific' ya existe");
+      return;
+    }
+    console.log("Creando proveedor 'pacific'...");
+    const proveedorPacific = provedorRepository.create({
+      nombre: "pacific",
+      contacto: "3814 05-0148",
+      descripcion: "proveedor de tucuman",
+    });
+    await provedorRepository.save(proveedorPacific);
+    console.log(`EXITO: Proveedor 'pacific' creado`);
+  } catch (error) {
+    console.error("ERROR: Error creando proveedor", error);
     throw error;
   }
 };
