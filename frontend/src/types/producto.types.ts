@@ -50,10 +50,9 @@ export interface AgregarImagenDTO {
 export interface HistorialPrecio {
   id: number;
   idProducto: number;
-  precioAnterior: number;
-  precioNuevo: number;
+  precio: string;
+  fechaCambio: string;
   tipo: string;
-  fecha: string;
 }
 
 export interface ImagenProducto {
