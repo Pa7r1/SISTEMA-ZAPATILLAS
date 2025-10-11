@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form";
 import { useCambiarPrecio } from "../../hooks/useProductos";
+import { formatPrecio } from "../../utils/general.utils";
 import type { CambioPrecioForm } from "../../schemas/producto.schemas";
 import type { Producto } from "../../types/producto.types";
 
@@ -24,7 +25,10 @@ export const CambiarPrecioForm = ({
   } = useForm<CambioPrecioForm>({
     defaultValues: {
       tipo: "local",
-      precio: producto.precioMiLocal,
+      precio:
+        typeof producto.precioMiLocal === "string"
+          ? parseFloat(producto.precioMiLocal)
+          : producto.precioMiLocal,
     },
   });
 
@@ -53,13 +57,13 @@ export const CambiarPrecioForm = ({
           <div>
             <p>Precio Proveedor:</p>
             <p className="font-bold text-lg">
-              ${producto.precioProveedor.toFixed(2)}
+              ${formatPrecio(producto.precioProveedor)}
             </p>
           </div>
           <div>
             <p>Precio Venta:</p>
             <p className="font-bold text-lg">
-              ${producto.precioMiLocal.toFixed(2)}
+              ${formatPrecio(producto.precioMiLocal)}
             </p>
           </div>
         </div>
@@ -83,7 +87,7 @@ export const CambiarPrecioForm = ({
         <div className="p-3 bg-blue-50 rounded">
           <p className="text-sm text-gray-600">
             Precio actual ({tipo === "local" ? "Venta" : "Proveedor"}):{" "}
-            <span className="font-bold">${precioActual.toFixed(2)}</span>
+            <span className="font-bold">${formatPrecio(precioActual)}</span>
           </p>
         </div>
 

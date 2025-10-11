@@ -7,6 +7,7 @@ import { CargaMasivaForm } from "./CargaMasivaForm";
 import { StockBajoList } from "./StockBajoList";
 import { HistorialPrecios } from "./HistorialPrecios";
 import { useProducto } from "../../hooks/useProductos";
+import { formatPrecio } from "../../utils/general.utils";
 import type { Producto } from "../../types/producto.types";
 
 type Vista =
@@ -128,13 +129,13 @@ export const ProductosPage = () => {
                 <div>
                   <p className="text-sm text-gray-600">Precio Proveedor</p>
                   <p className="text-xl font-semibold">
-                    ${productoSeleccionado.precioProveedor.toFixed(2)}
+                    ${formatPrecio(productoSeleccionado.precioProveedor)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Precio Venta</p>
                   <p className="text-xl font-semibold">
-                    ${productoSeleccionado.precioMiLocal.toFixed(2)}
+                    ${formatPrecio(productoSeleccionado.precioMiLocal)}
                   </p>
                 </div>
                 <div>
