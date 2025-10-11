@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStockBajo } from "../../hooks/useProductos";
+import { formatPrecio } from "../../utils/general.utils";
 
 interface StockBajoListProps {
   onAjustarStock?: (productoId: number) => void;
@@ -54,7 +55,7 @@ export const StockBajoList = ({ onAjustarStock }: StockBajoListProps) => {
                   )}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Precio: ${producto.precioMiLocal.toFixed(2)}
+                  Precio: ${formatPrecio(producto.precioMiLocal)}
                 </p>
               </div>
               {onAjustarStock && (

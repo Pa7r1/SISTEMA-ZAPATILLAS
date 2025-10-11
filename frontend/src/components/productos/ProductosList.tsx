@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useProductos, useEliminarProducto } from "../../hooks/useProductos";
+import { formatPrecio } from "../../utils/general.utils";
 import type { Producto } from "../../types/producto.types";
 
 interface ProductosListProps {
@@ -69,10 +70,10 @@ export const ProductosList = ({
                 <td className="px-4 py-2">{producto.id}</td>
                 <td className="px-4 py-2">{producto.nombre}</td>
                 <td className="px-4 py-2">
-                  ${producto.precioProveedor.toFixed(2)}
+                  ${formatPrecio(producto.precioProveedor)}
                 </td>
                 <td className="px-4 py-2">
-                  ${producto.precioMiLocal.toFixed(2)}
+                  ${formatPrecio(producto.precioMiLocal)}
                 </td>
                 <td className="px-4 py-2">
                   <span
