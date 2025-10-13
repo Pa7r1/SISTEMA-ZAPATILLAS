@@ -9,6 +9,7 @@ import { HistorialPrecios } from "./HistorialPrecios";
 import { useProducto } from "../../hooks/useProductos";
 import { formatPrecio } from "../../utils/general.utils";
 import type { Producto } from "../../types/producto.types";
+import { ProcesadorCatalogoWhatsApp } from "./ProcesadorCatalogoWhatsApp";
 
 type Vista =
   | "lista"
@@ -16,6 +17,7 @@ type Vista =
   | "editar"
   | "ajustarStock"
   | "cambiarPrecio"
+  | "descargaCatalogo"
   | "cargaMasiva"
   | "stockBajo"
   | "historial"
@@ -102,6 +104,9 @@ export const ProductosPage = () => {
             onCancel={handleVolver}
           />
         ) : null;
+
+      case "descargaCatalogo":
+        return <ProcesadorCatalogoWhatsApp />;
 
       case "cargaMasiva":
         return <CargaMasivaForm />;
@@ -237,6 +242,18 @@ export const ProductosPage = () => {
           >
             Stock Bajo
           </button>
+
+          <button
+            onClick={() => setVista("descargaCatalogo")}
+            className={`px-4 py-2 rounded ${
+              vista === "descargaCatalogo"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            Descargar Catalogo
+          </button>
+
           <button
             onClick={() => setVista("cargaMasiva")}
             className={`px-4 py-2 rounded ${
