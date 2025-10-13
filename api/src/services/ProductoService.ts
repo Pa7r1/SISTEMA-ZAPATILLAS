@@ -26,6 +26,7 @@ export interface IProductoService {
   obtenerConStockBajo(limite?: number): Promise<Producto[]>;
   obtenerHistorialPrecios(id: number): Promise<HistorialPrecio[]>;
   agregarImagen(id: number, url: string): Promise<ImagenProducto>;
+  eliminarTodos(): Promise<{ eliminados: number; mensaje: string }>;
 }
 
 export interface CrearProductoDto {
@@ -145,7 +146,6 @@ export class ProductoService implements IProductoService {
     await queryRunner.startTransaction();
 
     try {
-      // Crear el producto
       const nuevoProducto = this.productoRepository.create({
         idProveedor: data.idProveedor,
         nombre: data.nombre,
@@ -205,7 +205,6 @@ export class ProductoService implements IProductoService {
     await queryRunner.startTransaction();
 
     try {
-      // Verificar que el producto existe
       const productoExistente = await this.productoRepository.findOne({
         where: { id },
       });
@@ -213,7 +212,6 @@ export class ProductoService implements IProductoService {
         throw new Error("Producto no encontrado");
       }
 
-      // Preparar datos de actualización
       const datosActualizacion: any = {};
       if (data.nombre !== undefined) datosActualizacion.nombre = data.nombre;
       if (data.descripcion !== undefined)
@@ -270,7 +268,6 @@ export class ProductoService implements IProductoService {
     await queryRunner.startTransaction();
 
     try {
-      // Verificar que el producto existe
       const producto = await this.productoRepository.findOne({
         where: { id },
       });
@@ -279,7 +276,6 @@ export class ProductoService implements IProductoService {
         throw new Error("Producto no encontrado");
       }
 
-      // Verificar si tiene registros relacionados con lazy loading
       const detallesVenta = await queryRunner.manager.query(
         "SELECT COUNT(*) as count FROM detalle_venta_local WHERE id_producto = ?",
         [id]
@@ -338,13 +334,11 @@ export class ProductoService implements IProductoService {
     await queryRunner.startTransaction();
 
     try {
-      // Obtener producto actual
       const producto = await this.productoRepository.findOne({ where: { id } });
       if (!producto) {
         throw new Error("Producto no encontrado");
       }
 
-      // Calcular nuevo stock
       const nuevoStock = producto.stockActual + cantidad;
       if (nuevoStock < 0) {
         throw new Error("El ajuste resultaría en stock negativo");
@@ -430,7 +424,6 @@ export class ProductoService implements IProductoService {
 
   async agregarImagen(id: number, url: string): Promise<ImagenProducto> {
     try {
-      // Verificar que el producto existe
       const producto = await this.productoRepository.findOne({ where: { id } });
       if (!producto) {
         throw new Error("Producto no encontrado");
@@ -445,6 +438,86 @@ export class ProductoService implements IProductoService {
     } catch (error) {
       console.error(`Error agregando imagen al producto ${id}:`, error);
       throw new Error("Error al agregar imagen");
+    }
+  }
+
+  async eliminarTodos(): Promise<{ eliminados: number; mensaje: string }> {
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const productos = await this.productoRepository.find();
+      const totalProductos = productos.length;
+
+      if (totalProductos === 0) {
+        return {
+          eliminados: 0,
+          mensaje: "No hay productos para eliminar",
+        };
+      }
+
+      // Verificar si algún producto tiene transacciones
+      const productosConTransacciones: number[] = [];
+
+      for (const producto of productos) {
+        const detallesVenta = await queryRunner.manager.query(
+          "SELECT COUNT(*) as count FROM detalle_venta_local WHERE id_producto = ?",
+          [producto.id]
+        );
+        const detallesCompra = await queryRunner.manager.query(
+          "SELECT COUNT(*) as count FROM detalle_compra_mayorista WHERE id_producto = ?",
+          [producto.id]
+        );
+        const detallesEncargue = await queryRunner.manager.query(
+          "SELECT COUNT(*) as count FROM detalle_encargue_proveedor WHERE id_producto = ?",
+          [producto.id]
+        );
+
+        const tieneTransacciones =
+          detallesVenta[0].count > 0 ||
+          detallesCompra[0].count > 0 ||
+          detallesEncargue[0].count > 0;
+
+        if (tieneTransacciones) {
+          productosConTransacciones.push(producto.id);
+        }
+      }
+
+      // Si hay productos con transacciones, no permitir la eliminación total
+      if (productosConTransacciones.length > 0) {
+        throw new Error(
+          `No se puede eliminar todos los productos: ${productosConTransacciones.length} producto(s) tienen transacciones asociadas`
+        );
+      }
+
+      // Eliminar todos los registros relacionados primero
+      await queryRunner.manager.query("DELETE FROM historial_precio");
+      await queryRunner.manager.query("DELETE FROM imagen_producto");
+      await queryRunner.manager.query("DELETE FROM stock_movimiento");
+
+      // Eliminar todos los productos
+      await queryRunner.manager.query("DELETE FROM producto");
+
+      await queryRunner.commitTransaction();
+
+      return {
+        eliminados: totalProductos,
+        mensaje: `Se eliminaron ${totalProductos} producto(s) exitosamente`,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error("Error eliminando todos los productos:", error);
+
+      if (
+        error instanceof Error &&
+        error.message.includes("transacciones asociadas")
+      ) {
+        throw error;
+      }
+      throw new Error("Error al eliminar todos los productos");
+    } finally {
+      await queryRunner.release();
     }
   }
 
