@@ -108,7 +108,7 @@ export const productoService = {
     }
   ): Promise<{ resultados: ResultadoCargaMasiva; resumen: any }> => {
     const formData = new FormData();
-    formData.append("file", archivo);
+    formData.append("archivo", archivo);
 
     if (config.idProveedor) {
       formData.append("idProveedor", config.idProveedor.toString());
