@@ -502,6 +502,20 @@ const agregarImagen = asyncHandler(
   }
 );
 
+const eliminarTodosProductos = asyncHandler(
+  async (_req: Request, res: Response): Promise<void> => {
+    const resultado = await productoService.eliminarTodos();
+
+    res.status(200).json({
+      success: true,
+      message: resultado.mensaje,
+      data: {
+        eliminados: resultado.eliminados,
+      },
+    });
+  }
+);
+
 // Exportar controlador siguiendo el patrón
 const productosController: Controller = {
   name: "productos",
@@ -523,6 +537,7 @@ const productosController: Controller = {
   agregarImagen: [validarId, validarImagen, agregarImagen],
   cargaMasiva: [validarCargaMasiva, cargaMasivaProductos],
   cargarArchivo: [uploadJSON, cargaMasivaDesdeArchivo],
+  deleteAll: eliminarTodosProductos,
 };
 
 export default productosController;
