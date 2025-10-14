@@ -447,18 +447,21 @@ export class ProductoService implements IProductoService {
     await queryRunner.startTransaction();
 
     try {
+      // Obtener todos los productos
       const productos = await this.productoRepository.find();
       const totalProductos = productos.length;
 
       if (totalProductos === 0) {
+        await queryRunner.release();
         return {
           eliminados: 0,
           mensaje: "No hay productos para eliminar",
         };
       }
 
-      // Verificar si algún producto tiene transacciones
-      const productosConTransacciones: number[] = [];
+      console.log(`Iniciando eliminación de ${totalProductos} productos`);
+
+      let productosConTransacciones = 0;
 
       for (const producto of productos) {
         const detallesVenta = await queryRunner.manager.query(
@@ -480,34 +483,81 @@ export class ProductoService implements IProductoService {
           detallesEncargue[0].count > 0;
 
         if (tieneTransacciones) {
-          productosConTransacciones.push(producto.id);
+          productosConTransacciones++;
         }
       }
 
-      // Si hay productos con transacciones, no permitir la eliminación total
-      if (productosConTransacciones.length > 0) {
+      if (productosConTransacciones > 0) {
+        await queryRunner.rollbackTransaction();
+        await queryRunner.release();
         throw new Error(
-          `No se puede eliminar todos los productos: ${productosConTransacciones.length} producto(s) tienen transacciones asociadas`
+          `No se puede eliminar todos los productos: ${productosConTransacciones} producto(s) tienen transacciones asociadas`
         );
       }
 
-      // Eliminar todos los registros relacionados primero
-      await queryRunner.manager.query("DELETE FROM historial_precio");
-      await queryRunner.manager.query("DELETE FROM imagen_producto");
-      await queryRunner.manager.query("DELETE FROM stock_movimiento");
+      const productIds = productos.map((p) => p.id);
 
-      // Eliminar todos los productos
-      await queryRunner.manager.query("DELETE FROM producto");
+      console.log(
+        `Eliminando registros relacionados de ${productIds.length} productos`
+      );
+
+      // Eliminar en lotes para evitar problemas con IN() muy grandes
+      const batchSize = 100;
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        const batch = productIds.slice(i, i + batchSize);
+
+        // Eliminar HistorialPrecio
+        await queryRunner.manager
+          .createQueryBuilder()
+          .delete()
+          .from(HistorialPrecio)
+          .where("idProducto IN (:...ids)", { ids: batch })
+          .execute();
+
+        // Eliminar ImagenProducto
+        await queryRunner.manager
+          .createQueryBuilder()
+          .delete()
+          .from(ImagenProducto)
+          .where("idProducto IN (:...ids)", { ids: batch })
+          .execute();
+
+        // Eliminar StockMovimiento
+        await queryRunner.manager
+          .createQueryBuilder()
+          .delete()
+          .from(StockMovimiento)
+          .where("idProducto IN (:...ids)", { ids: batch })
+          .execute();
+      }
+
+      console.log("Registros relacionados eliminados, eliminando productos...");
+
+      // Ahora eliminar todos los productos en lotes
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        const batch = productIds.slice(i, i + batchSize);
+
+        await queryRunner.manager
+          .createQueryBuilder()
+          .delete()
+          .from(Producto)
+          .where("id IN (:...ids)", { ids: batch })
+          .execute();
+      }
+
+      console.log("Todos los productos eliminados exitosamente");
 
       await queryRunner.commitTransaction();
+      await queryRunner.release();
 
       return {
         eliminados: totalProductos,
-        mensaje: `Se eliminaron ${totalProductos} producto(s) exitosamente`,
+        mensaje: `Se eliminaron ${totalProductos} productos exitosamente`,
       };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
       console.error("Error eliminando todos los productos:", error);
+      await queryRunner.rollbackTransaction();
+      await queryRunner.release();
 
       if (
         error instanceof Error &&
@@ -516,8 +566,6 @@ export class ProductoService implements IProductoService {
         throw error;
       }
       throw new Error("Error al eliminar todos los productos");
-    } finally {
-      await queryRunner.release();
     }
   }
 
