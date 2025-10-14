@@ -113,7 +113,7 @@ export const MethodMap: Record<string, RouteConfig> = {
     url: (name: string) => `/${name}/cargar-archivo`,
   },
   deleteAll: {
-    method: "delete",
+    method: "post",
     url: (name: string) => `/${name}/eliminar-todos`,
   },
 } as const;
