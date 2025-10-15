@@ -15,6 +15,8 @@ import {
 import {
   parsePrecioFromCatalog,
   normalizeProductName,
+  redondearPrecioLocal,
+  aplicarAumentoPorcentaje,
 } from "../helpers/helpersProducto.js";
 
 const productoService = new ProductoService();
@@ -227,25 +229,31 @@ const cargaMasivaDesdeArchivo = asyncHandler(
             continue;
           }
 
-          let precioNumerico: number;
+          let precioProveedor: number;
+          let precioLocal: number;
 
           try {
-            precioNumerico = parsePrecioFromCatalog(precio);
+            precioProveedor = parsePrecioFromCatalog(precio);
 
+            let precioConAumento = precioProveedor;
             if (aumentoPorcentaje > 0) {
-              precioNumerico = precioNumerico * (1 + aumentoPorcentaje / 100);
-              precioNumerico = Math.round(precioNumerico * 100) / 100;
+              precioConAumento = aplicarAumentoPorcentaje(
+                precioProveedor,
+                aumentoPorcentaje
+              );
             }
+
+            precioLocal = redondearPrecioLocal(precioConAumento);
           } catch (error) {
             throw new Error(
-              `Error parseando el precio "${precio}": ${error instanceof Error ? error.message : "Error desconocido"}`
+              `Error parseando precio "${precio}": ${error instanceof Error ? error.message : "Error desconocido"}`
             );
           }
 
           const descripcionLimpia = descripcion
             ? descripcion
-                .replace(/(?:\*{2}.*?\*{2}|\*{1,2})/g, "") // Remover ** texto **
-                .replace(/[\r\n]+/g, " ") // Reemplazar saltos de línea con espacios
+                .replace(/(?:\*{2}.*?\*{2}|\*{1,2})/g, "")
+                .replace(/[\r\n]+/g, " ")
                 .trim()
             : null;
 
@@ -253,8 +261,8 @@ const cargaMasivaDesdeArchivo = asyncHandler(
             idProveedor: idProveedor,
             nombre: nombre.trim(),
             descripcion: descripcionLimpia,
-            precioProveedor: precioNumerico * 0.7, // Precio proveedor estimado (30% menos)
-            precioMiLocal: precioNumerico,
+            precioProveedor: precioProveedor,
+            precioMiLocal: precioLocal,
             stockActual: stockPorDefecto,
           });
 
@@ -266,7 +274,8 @@ const cargaMasivaDesdeArchivo = asyncHandler(
             nombre: nombre,
             estado: "creado",
             id: nuevoProducto.id,
-            precioFinal: precioNumerico,
+            precioProveedor: precioProveedor,
+            precioLocal: precioLocal,
           });
         } catch (error) {
           resultados.errores++;
@@ -279,6 +288,7 @@ const cargaMasivaDesdeArchivo = asyncHandler(
           });
         }
       }
+
       res.status(200).json({
         success: true,
         message: "Carga masiva desde archivo completada",

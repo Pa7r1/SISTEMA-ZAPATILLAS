@@ -447,7 +447,6 @@ export class ProductoService implements IProductoService {
     await queryRunner.startTransaction();
 
     try {
-      // Obtener todos los productos
       const productos = await this.productoRepository.find();
       const totalProductos = productos.length;
 
