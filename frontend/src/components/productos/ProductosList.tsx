@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { useProductos, useEliminarProducto } from "../../hooks/useProductos";
+import {
+  useProductos,
+  useEliminarProducto,
+  useEliminarTodos,
+} from "../../hooks/useProductos";
 import { formatPrecio } from "../../utils/general.utils";
 import type { Producto } from "../../types/producto.types";
 
@@ -14,6 +18,7 @@ export const ProductosList = ({
 }: ProductosListProps) => {
   const { data: productos, isLoading, error } = useProductos();
   const eliminarMutation = useEliminarProducto();
+  const eliminarTodosMutation = useEliminarTodos();
   const [busqueda, setBusqueda] = useState("");
 
   const handleEliminar = async (id: number) => {
@@ -23,6 +28,17 @@ export const ProductosList = ({
         alert("Producto eliminado exitosamente");
       } catch (error) {
         alert("Error al eliminar el producto");
+      }
+    }
+  };
+
+  const handleEliminarTodo = async () => {
+    if (window.confirm("¿Seguro de eliminar todos los productos?")) {
+      try {
+        await eliminarTodosMutation.mutateAsync();
+        alert("Todos los productos fueron eliminados exitosamente");
+      } catch (error) {
+        alert("Error al eliminar todos los productos");
       }
     }
   };
@@ -138,6 +154,13 @@ export const ProductosList = ({
 
       <div className="mt-4 text-sm text-gray-600">
         Total: {productosFiltrados?.length || 0} productos
+        <button
+          onClick={handleEliminarTodo}
+          disabled={eliminarTodosMutation.isPending}
+          className="ml-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+        >
+          Eliminar todos los productos
+        </button>
       </div>
     </div>
   );

@@ -43,6 +43,10 @@ export const productoService = {
     await api.delete(`${BASE_URL}/${id}`);
   },
 
+  eliminarTodo: async (): Promise<void> => {
+    await api.post(`${BASE_URL}/eliminar-todos`);
+  },
+
   // Búsqueda
   buscar: async (termino: string): Promise<Producto[]> => {
     const { data } = await api.get(`${BASE_URL}/buscar`, {

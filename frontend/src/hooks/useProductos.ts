@@ -101,6 +101,17 @@ export const useEliminarProducto = () => {
   });
 };
 
+export const useEliminarTodos = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => productoService.eliminarTodo(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.productos });
+    },
+  });
+};
+
 export const useAjustarStock = () => {
   const queryClient = useQueryClient();
 
