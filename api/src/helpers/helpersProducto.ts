@@ -1,4 +1,3 @@
-// Helper para parsear precios desde formato de catálogo
 export const parsePrecioFromCatalog = (precioStr: string): number => {
   if (!precioStr || precioStr.toLowerCase().includes("sin precio")) {
     throw new Error("Precio inválido");
@@ -30,10 +29,9 @@ export const parsePrecioFromCatalog = (precioStr: string): number => {
     throw new Error("Precio demasiado bajo o inválido");
   }
 
-  return Math.round(valorNumerico * 100) / 100; // Redondear a 2 decimales
+  return valorNumerico;
 };
 
-// Helper para normalizar nombres para detectar duplicados
 export const normalizeProductName = (nombre: string): string => {
   return nombre
     .trim()
@@ -42,4 +40,37 @@ export const normalizeProductName = (nombre: string): string => {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\w\s]/g, "");
+};
+
+export const redondearPrecioLocal = (precio: number): number => {
+  if (precio < 200) {
+    return 100;
+  }
+
+  if (precio >= 200 && precio <= 600) {
+    return 500;
+  }
+
+  return Math.ceil(precio / 1000) * 1000;
+};
+
+export const aplicarAumentoPorcentaje = (
+  precioBase: number,
+  porcentaje: number
+): number => {
+  if (porcentaje <= 0) return precioBase;
+  return precioBase * (1 + porcentaje / 100);
+};
+
+export const formatearPrecioArgentino = (precio: number): string => {
+  const partes = precio.toString().split(".");
+  const entero = partes[0] || "0";
+  const decimales = partes[1];
+  const enteroFormateado = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  if (decimales) {
+    return `${enteroFormateado},${decimales}`;
+  }
+
+  return enteroFormateado;
 };
