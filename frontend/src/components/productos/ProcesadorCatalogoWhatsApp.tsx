@@ -155,6 +155,10 @@ if (productos.length === 0) {
       return;
     }
 
+    const formatearPrecio = (precio: number): string => {
+      return precio.toLocaleString("es-AR");
+    };
+
     const productosMapeados = productos
       .map((producto: any) => {
         if (!producto || !producto.precio) return null;
@@ -164,7 +168,7 @@ if (productos.length === 0) {
         const valorNumerico = parsePrecio(producto.precio);
         if (isNaN(valorNumerico) || valorNumerico < 100) return null;
 
-        const precioFormateado = valorNumerico.toFixed(2);
+        const precioFormateado = formatearPrecio(valorNumerico);
 
         const descripcionCruda = producto.descripcion || "";
         const regexTalle = /(Talle?s?:.*)/i;
